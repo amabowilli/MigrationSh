@@ -1,3 +1,4 @@
+from resources.logger import logger
 from requests import Session, Response
 from requests.exceptions import SSLError
 from time import sleep
@@ -13,12 +14,13 @@ class Instance():
     def verify_session(verify_api_endpoint: str, session: Session) -> None:
         r = session.get(verify_api_endpoint)
         if Instance.authorized(r.status_code) and r.status_code >= 400:
-            exit(f'FATAL: Could not successfully interact with the api at {verify_api_endpoint} error: HTTP {r.status_code}. Closing...')
+            logger.critical(f'FATAL: Could not successfully interact with the api at {verify_api_endpoint} error: HTTP {r.status_code}. Closing...')
+            exit()
 
     @staticmethod
     def rate_limited(status_code: int) -> bool:
         if status_code == 429:
-            print('WARN: Hit api rate limit, sleeping for 1 minute then attempting to resume...')
+            logger.warn('WARN: Hit api rate limit, sleeping for 1 minute then attempting to resume...')
             sleep(60)
             return True
         return False
@@ -26,12 +28,14 @@ class Instance():
     @staticmethod
     def authorized(status_code: int) -> bool:
         if status_code == 401:
-            exit('FATAL: Received "Unauthorized" (HTTP 401) response from your instance. '
-                 'Please check your credentials and try again.')
+            logger.critical('FATAL: Received "Unauthorized" (HTTP 401) response from your instance. '
+                            'Please check your credentials and try again.')
+            exit()
         elif status_code == 403:
-            exit('FATAL: Received "Forbidden" (HTTP 403) response from your instance. '
-                 'Please ensure you have the necessary admin permissions '
-                 'and that your client is IP whitelisted before trying again.')
+            logger.critical('FATAL: Received "Forbidden" (HTTP 403) response from your instance. '
+                            'Please ensure you have the necessary admin permissions '
+                            'and that your client is IP whitelisted before trying again.')
+            exit()
         return True
 
 
@@ -50,6 +54,10 @@ class ServerInstance(Instance):
         self.verify_session(f'{self.api}/admin/cluster', self.session)
 
     def _verify_url(self) -> None:
+        # strip off a trailing slash if it's present so that a "//" doesn't appear
+        while self.url.endswith('/'):
+            self.url = self.url[:-1]
+
         try:
             r = self.get_api(f'{self.url}/status')
         except SSLError:
@@ -57,7 +65,8 @@ class ServerInstance(Instance):
             r = self.get_api(f'{self.url}/status')
 
         if not "RUNNING" in r.text:
-            exit(f'FATAL: Did not get a "RUNNING" response from the url "{self.url}/status", cannot continue. Closing...')
+            logger.critical(f'FATAL: Did not get a "RUNNING" response from the url "{self.url}/status", cannot continue. Closing...')
+            exit()
 
     def get_api(self, endpoint: str, params: dict=None) -> Response:
         while True:

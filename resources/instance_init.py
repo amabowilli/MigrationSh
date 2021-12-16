@@ -1,8 +1,18 @@
+from urllib3 import disable_warnings
+from urllib3.exceptions import InsecureRequestWarning
+from time import sleep
+
 from resources.logger import logger
 from requests import Session, Response
 from requests.exceptions import SSLError
-from time import sleep
-import env
+
+try:
+    import env
+except ImportError:
+    logger.critical('Could not detect the "env.py" file. Please confirm you have copied the "env-template.py"'
+                    'file over and filled it in before attempting to run the script again.')
+    exit()
+
 
 class Instance():
     def __new__(cls, *args, **kwargs):
@@ -61,6 +71,7 @@ class ServerInstance(Instance):
         try:
             r = self.get_api(f'{self.url}/status')
         except SSLError:
+            disable_warnings(InsecureRequestWarning) # Hides ssl auth failure warnings if your server instance uses self-signed certs
             self.ssl_verified = False # Using https but ssl cert is self-signed or other issue, ignorable
             r = self.get_api(f'{self.url}/status')
 

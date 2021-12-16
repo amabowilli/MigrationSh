@@ -1,6 +1,8 @@
-from resources.instance_init import ServerInstance, CloudInstance
 from dataclasses import dataclass, field
 from typing import Generator
+
+from resources.instance_init import ServerInstance, CloudInstance
+
 
 @dataclass
 class User:

@@ -1,8 +1,8 @@
 from resources.instance_actions import Group, Project, Repository, ServerActions as SA, CloudActions as CA
 from resources.instance_init import ServerInstance, CloudInstance
+from resources.logger import logger
 from typing import Tuple
-from .instance_actions import Project
-from .logger import logger
+
 
 class ServerDetails:
     @staticmethod
@@ -49,11 +49,11 @@ class ActionOnItems:
 
         for group_name in groups_to_migrate:
             if not CA.create_group(cloud, group_name):
-                print(f'WARN: Failed to mirror group "{group_name}" to your cloud instance for unknown reason.')
+                logger.warn(f'Failed to mirror group "{group_name}" to your cloud instance for unknown reason.')
                 continue
             success, permission = ActionOnItems.add_group_global_perms(cloud, group_name, global_groups)
             if not success:
-                print(f'WARN: Failed to apply global permissions to {group_name} within your cloud instance.')
+                logger.warn(f'Failed to apply global permissions to {group_name} within your cloud instance.')
             if permission == "create_repositories":
                 group_workspace_privileges.get('create_repositories').append(group_name)
             elif permission == "admin_workspace":
@@ -67,15 +67,13 @@ class ActionOnItems:
                     group_memberships += 1
 
             if len(group_migration['total_users']) == len(group_migration['migrated_users']):
-                print(f'INFO: Successfully migrated all {len(group_migration["total_users"])} users in group: {group_name}')
+                logger.info(f'Successfully migrated all {len(group_migration["total_users"])} users in group: {group_name}')
             else:
-                print(f"WARN: Successfully migrated {len(group_migration['migrated_users'])} of {len(group_migration['total_users'])} members of {group_name}.",
-                      "Failed to mirror the following users to the group's membership (Likely due to the user not being present in the workspace):")
-                print('-'*10)
-                print(', '.join([user_email for user_email in group_migration['total_users'] if user_email not in group_migration['migrated_users']]))
-                print('-'*10)
+                logger.warn(f"Successfully migrated {len(group_migration['migrated_users'])} of {len(group_migration['total_users'])} members of {group_name}. "
+                            "Failed to mirror the following users to the group's membership (Likely due to the user not being present in the workspace):\n" +
+                            ', '.join([user_email for user_email in group_migration['total_users'] if user_email not in group_migration['migrated_users']]))
 
-        print(f'INFO: Mirrored {group_counter} groups with {group_memberships} group membership assignments')
+        logger.info(f'INFO: Mirrored {group_counter} groups with {group_memberships} group membership assignments')
         return group_workspace_privileges
 
     @staticmethod
@@ -107,9 +105,9 @@ class ActionOnItems:
             repo: Repository
             for repo in project.repositories:
                 if not CA.verify_repo_exists(cloud, repo.slug):
-                    print(f'INFO: Skipping repo "{repo.name}" as it is not present within your cloud workspace. This may not have been migrated yet.')
+                    logger.info(f'Skipping repo "{repo.name}" as it is not present within your cloud workspace. This may not have been migrated yet.')
                     continue
-                print(f'INFO: Mirroring group permissions for repo: "{repo.name}"')
+                logger.info(f'Mirroring group permissions for repo: "{repo.name}"')
                 atleast_one_group_migrated = False
                 for group_name, flattened_permission in ActionOnItems.max_permission(project.default_permission, project.groups, repo.default_permission, repo.groups, groups_to_migrate):
                     if flattened_permission == "none":
@@ -117,11 +115,11 @@ class ActionOnItems:
                     if CA.add_group_to_repo(cloud, repo.slug, group_name, flattened_permission):
                         atleast_one_group_migrated = True
                     else:
-                        print(f'WARN: Failed to add group "{group_name}" with permission "{flattened_permission}" to "{repo.name}".')
+                        logger.error(f'Failed to add group "{group_name}" with permission "{flattened_permission}" to "{repo.name}".')
                 if atleast_one_group_migrated:
                     successful_repo_counter += 1
                 total_repo_counter += 1
-        print(f'INFO: Successfully mirrored the groups/permissions for {successful_repo_counter} of {total_repo_counter} repositories.')
+        logger.info(f'Successfully mirrored the groups/permissions for {successful_repo_counter} of {total_repo_counter} repositories.')
 
     @staticmethod
     def max_permission(project_default_permission: str, project_groups: list[Group], repo_default_permission: str, repo_groups: list[Group], groups_to_migrate: list[str]) -> str:
@@ -164,14 +162,12 @@ class ActionOnItems:
 
     @staticmethod
     def print_group_privilege_details(group_workspace_privileges: dict, workspace_name: str) -> None:
-        logger.info("\n\nThe following groups had a level of permission within Bitbucket "
-                    "Server that the API does not allow this script to mirror.\n"
-                    "We recommend going to your workspace group settings page, Found at:"
-                    f" https://bitbucket.org/{workspace_name}/workspace/settings/groups,"
-                    " to add the following settings:")
+        logger.info("The following groups had a level of permission within Bitbucket "
+                    "Server that the API does not allow this script to mirror. "
+                    "We recommend going to your workspace group settings page, Found at: "
+                    f"https://bitbucket.org/{workspace_name}/workspace/settings/groups, "
+                    "to add the following settings:")
         
-        logger.info('\n----- "Create Repositories" -----')
-        logger.info(', '.join(group_workspace_privileges.get('create_repositories')))
+        logger.info('"Create Repositories" Permission: ' + ', '.join(group_workspace_privileges.get('create_repositories')))
 
-        logger.info('\n----- "Administer Workspace" ----- (automatically inherits the "Create Repositories" permission)')
-        logger.info(', '.join(group_workspace_privileges.get('admin_workspace')))
+        logger.info('"Administer Workspace" Permission: ' + ', '.join(group_workspace_privileges.get('admin_workspace')))

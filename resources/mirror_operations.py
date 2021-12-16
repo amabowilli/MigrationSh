@@ -2,10 +2,11 @@ from resources.instance_actions import Group, Project, Repository, ServerActions
 from resources.instance_init import ServerInstance, CloudInstance
 from typing import Tuple
 from .instance_actions import Project
+from .logger import logger
 
 class ServerDetails:
     @staticmethod
-    def scan_server_structure(server: ServerInstance) -> Tuple[list, dict, list]:
+    def scan_server_structure(server: ServerInstance) -> Tuple[list[str], dict[Group], list[Project]]:
         groups_to_migrate = []
         global_groups = []
         for group in SA.get_group_global_permissions(server):
@@ -23,10 +24,6 @@ class ServerDetails:
     def get_project_and_repo_structure(server: ServerInstance) -> Tuple[list[Group], list[Project]]:
         used_groups = []
         project_repo_structure = []
-        ''' TODO
-        Potentially speed up the script by multi-threading out each group and repo respectively
-        as there's a lot of wasted time waiting for network responses (I/O).
-        '''
         for project in SA.get_projects(server):
             for group in SA.get_project_groups(server, project):
                 project.groups.append(group)
@@ -167,11 +164,14 @@ class ActionOnItems:
 
     @staticmethod
     def print_group_privilege_details(group_workspace_privileges: dict, workspace_name: str) -> None:
-        print("\n\nThe following groups had a level of permission within Bitbucket Server that the API does not allow this script to mirror.\n"
-              f"We recommend going to your workspace group settings page, Found at: https://bitbucket.org/{workspace_name}/workspace/settings/groups, to add the following settings:")
+        logger.info("\n\nThe following groups had a level of permission within Bitbucket "
+                    "Server that the API does not allow this script to mirror.\n"
+                    "We recommend going to your workspace group settings page, Found at:"
+                    f" https://bitbucket.org/{workspace_name}/workspace/settings/groups,"
+                    " to add the following settings:")
         
-        print('\n----- "Create Repositories" -----')
-        print(', '.join(group_workspace_privileges.get('create_repositories')))
+        logger.info('\n----- "Create Repositories" -----')
+        logger.info(', '.join(group_workspace_privileges.get('create_repositories')))
 
-        print('\n----- "Administer Workspace" ----- (automatically inherits the "Create Repositories" permission)')
-        print(', '.join(group_workspace_privileges.get('admin_workspace')))
+        logger.info('\n----- "Administer Workspace" ----- (automatically inherits the "Create Repositories" permission)')
+        logger.info(', '.join(group_workspace_privileges.get('admin_workspace')))

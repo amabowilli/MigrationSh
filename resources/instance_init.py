@@ -54,12 +54,12 @@ class ServerInstance(Instance):
         self.username = env.server_username
         self.password = env.server_password
         self.url = env.server_url
-        self.api = f'{self.url}/rest/api/latest'
         self.ssl_verified = True
         self.session = Session()
         self.session.auth = (self.username, self.password)
         self.session.headers.update({'Accept': 'application/json', 'Content-type': 'application/json'})
         self._verify_url()
+        self.api = f'{self.url}/rest/api/latest'
         # https://docs.atlassian.com/bitbucket-server/rest/7.15.1/bitbucket-rest.html#idp45
         self.verify_session(f'{self.api}/admin/cluster', self.session)
 
